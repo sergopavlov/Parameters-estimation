@@ -35,28 +35,54 @@ namespace myns
             List<double> res = new();
             for (int i = 0; i < n; i++)
             {
+                b.Add(0);
                 res.Add(0);
             }
-            for (int i = 0; i < n; i++)
+            
+            double penalty = 0;
+            for (int i = 0; i < m; i++)
             {
-                for (int j = 0; j < n; j++)
+                penalty += (CalcV(i,res,sigma,A,B,M,N) - V[i])* (CalcV(i, res, sigma, A, B, M, N) - V[i]) / (V[i] * V[i]);
+            }
+            penalty = Math.Sqrt(penalty);
+            Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
+            
+            while (penalty > 1e-14)
+            {
+
+
+                for (int i = 0; i < n; i++)
                 {
+                    for (int j = 0; j < n; j++)
+                    {
+                        for (int k = 0; k < m; k++)
+                        {
+                            mat.mat[i][j] += 1 / (V[k] * V[k] * 4 * Math.PI * Math.PI * sigma * sigma) * (1 / (B[j] - M[k]).Norm - 1 / (A[j] - M[k]).Norm - 1 / (B[j] - N[k]).Norm + 1 / (A[j] - N[k]).Norm) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm);
+                        }
+                    }
+                    b[i] = 0;
                     for (int k = 0; k < m; k++)
                     {
-                        mat.mat[i][j] += 1 / (V[k] * V[k] * 4 * Math.PI * Math.PI * sigma * sigma) * (1 / (B[j] - M[k]).Norm - 1 / (A[j] - M[k]).Norm - 1 / (B[j] - N[k]).Norm + 1 / (A[j] - N[k]).Norm) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm);
+                        b[i] += 1 / (V[k] * V[k] * 2 * Math.PI * sigma) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm) * (V[k] - CalcV(k, res, sigma, A, B, M, N));
                     }
+                    mat.mat[i][i] += 1e-15;
                 }
-                b.Add(0);
-                for (int k = 0; k < m; k++)
-                {
-                    b[i] += 1 / (V[k] * V[k] * 2 * Math.PI * sigma) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm) * (V[k] - CalcV(k, res, sigma, A, B, M, N));
-                }
-                mat.mat[i][i] += 1e-10;
-            }
-            
-            var sadasd = mat.SolveLU(b);
 
-            Console.WriteLine("Hello World!");
+                var dres= mat.SolveLU(b);
+                for (int i = 0; i < n; i++)
+                {
+                    res[i] += dres[i];
+                }
+                mat.Clear();
+                penalty = 0;
+                for (int i = 0; i < m; i++)
+                {
+                    penalty += (CalcV(i, res, sigma, A, B, M, N) - V[i]) * (CalcV(i, res, sigma, A, B, M, N) - V[i]) / (V[i] * V[i]);
+                }
+                penalty = Math.Sqrt(penalty);
+                Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
+            }
+           
 
         }
 
