@@ -1,15 +1,94 @@
 ﻿using System;
 using System.IO;
+using System.Security.Cryptography;
 
 namespace lab2
 {
     internal class Program
     {
+        MFE mfe = new MFE("txt/Grid.txt", 30, 0.01, 0.01);
         static void Main(string[] args)
         {
-            MFE mfe = new MFE("txt/Grid.txt", 30, 1, 1);
-            Console.WriteLine($"{mfe.GetSollution(1, 0)} {mfe.GetSollution(2, 0)} {mfe.GetSollution(5, 0)} {mfe.GetSollution(10, 0)}");
-            Console.WriteLine($"{mfe.GetSollution(1, 0)} {mfe.GetSollution(2, 0)} {mfe.GetSollution(5, 0)} {mfe.GetSollution(10, 0)}");
+            List<Vector> A = new();
+            List<Vector> B = new();
+            List<Vector> M = new();
+            List<Vector> N = new();
+            List<double> V = new();
+            foreach (var item in File.ReadLines("txt/напряжения.txt"))
+            {
+                V.Add(double.Parse(item));
+            }
+            foreach (var item in File.ReadAllLines("txt/источники.txt"))
+            {
+                var cur = item.Split(' ');
+                A.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
+                B.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
+            }
+            foreach (var item in File.ReadAllLines("txt/приемники.txt"))
+            {
+                var cur = item.Split(' ');
+                M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
+                N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
+            }
+            MatrixFull mat = new MatrixFull(2);
+            List<double> b = new();
+            List<double> res = new();
+            for (int i = 0; i < 2; i++)
+            {
+                b.Add(0);
+                res.Add(0);
+            }
+
+            double penalty = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                penalty += (CalcV(i, A, B, M, N) - V[i]) * (CalcV(i, A, B, M, N) - V[i]) / (V[i] * V[i]);
+            }
+            penalty = Math.Sqrt(penalty);
+            Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
+
+            while (penalty > 1e-14)
+            {
+
+
+                for (int i = 0; i < n; i++)
+                {
+                    for (int j = 0; j < n; j++)
+                    {
+                        for (int k = 0; k < m; k++)
+                        {
+                            mat.mat[i][j] += 1 / (V[k] * V[k] * 4 * Math.PI * Math.PI * sigma * sigma) * (1 / (B[j] - M[k]).Norm - 1 / (A[j] - M[k]).Norm - 1 / (B[j] - N[k]).Norm + 1 / (A[j] - N[k]).Norm) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm);
+                        }
+                    }
+                    b[i] = 0;
+                    for (int k = 0; k < m; k++)
+                    {
+                        b[i] += 1 / (V[k] * V[k] * 2 * Math.PI * sigma) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm) * (V[k] - CalcV(k, res, sigma, A, B, M, N));
+                    }
+                    mat.mat[i][i] += 1e-15;
+                }
+
+                var dres = mat.SolveLU(b);
+                for (int i = 0; i < n; i++)
+                {
+                    res[i] += dres[i];
+                }
+                mat.Clear();
+                penalty = 0;
+                for (int i = 0; i < m; i++)
+                {
+                    penalty += (CalcV(i, res, sigma, A, B, M, N) - V[i]) * (CalcV(i, res, sigma, A, B, M, N) - V[i]) / (V[i] * V[i]);
+                }
+                penalty = Math.Sqrt(penalty);
+                Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
+            }
+
+        }
+        public static double CalcV(int i, List<Vector> A, List<Vector> B, List<Vector> M, List<Vector> N)
+        {
+            double res = 0;
+            res = mfe.GetSollution((B[0] - M[i]).Norm, 0) - mfe.GetSollution((A[0] - M[i]).Norm, 0) - mfe.GetSollution((B[0] - N[i]).Norm, 0) + mfe.GetSollution((A[0] - N[i]).Norm, 0);
+            return res;
         }
 
     }
@@ -89,7 +168,7 @@ namespace lab2
                     }
                     if (z == zn - 1 && r == 0)
                     {
-                        mat.b[r + (rn + 1) * (z + 1)] += 1;
+                        mat.b[r + (rn + 1) * (z + 1)] += 1 / 2.0 / Math.PI;
                     }
                 }
             }
@@ -322,6 +401,9 @@ namespace lab2
         public List<double> di = new();
         public List<double> al = new();
         public List<double> b = new();
+        public List<double> di_LU = new();
+        public List<double> au_LU = new();
+        public List<double> al_LU = new();
         public Matrix(int n)
         {
             this.n = n;
@@ -377,6 +459,174 @@ namespace lab2
             Console.WriteLine($"{k} {rnorm / bnorm}");
             return x0;
         }
+        public void LU()
+        {
+
+            foreach (var item in di)
+            {
+                di_LU.Add(item);
+            }
+            foreach (var item in al)
+            {
+                au_LU.Add(item);
+            }
+            foreach (var item in al)
+            {
+                al_LU.Add(item);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                double sumdi = 0.0;
+
+                int i0 = ia[i];
+                int i1 = ia[i + 1];
+
+
+                for (int k = i0; k < i1; k++)
+                {
+                    int j = ja[k];
+                    int j0 = ia[j];
+
+                    int j1 = ia[j + 1];
+
+
+                    int ik = i0;
+                    int kj = j0;
+
+                    double suml = 0.0;
+                    double sumu = 0.0;
+
+                    while (ik < k)
+                    {
+
+                        if (ja[ik] == ja[kj])
+                        {
+
+                            suml += al_LU[ik] * au_LU[kj];
+                            sumu += au_LU[ik] * al_LU[kj];
+                            ik++;
+                            kj++;
+                        }
+
+                        else
+                        {
+                            if (ja[ik] > ja[kj])
+                            {
+                                kj++;
+                            }
+                            else
+                            {
+                                ik++;
+                            }
+                        }
+                    }
+
+                    al_LU[k] = al_LU[k] - suml;
+                    au_LU[k] = (au_LU[k] - sumu) / di_LU[j];
+                    sumdi += al_LU[k] * au_LU[k];
+                }
+
+                di_LU[i] = di_LU[i] - sumdi;
+            }
+        }
+        List<double> LUDirect(List<double> rpart)
+        {
+            List<double> res = new();
+            for (int i = 0; i < n; i++)
+            {
+                res.Add(rpart[i]);
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                double sum = 0.0;
+                for (int j = ia[i]; j < ia[i + 1]; j++)
+                    sum += al_LU[j] * res[ja[j]];
+                res[i] -= sum;
+                res[i] /= di_LU[i];
+            }
+            return res;
+        }
+        List<double> LUReverse(List<double> rpart)
+        {
+            List<double> res = new();
+            for (int i = 0; i < n; i++)
+            {
+                res.Add(rpart[i]);
+            }
+
+            for (int i = n - 1; i >= 0; i--)
+            {
+                for (int j = ia[i]; j < ia[i + 1]; j++)
+                    res[ja[j]] -= au_LU[j] * res[i];
+            }
+            return res;
+        }
+        List<double> MultU(List<double> x0)
+        {
+            List<double> res = new();
+            for (int i = 0; i < n; i++)
+            {
+                res.Add(x0[i]);
+                int k0 = ia[i], k1 = ia[i + 1];
+                for (int k = k0; k < k1; k++)
+                {
+                    res[i] += au_LU[k] * x0[ja[k]];
+                }
+            }
+            return res;
+        }
+        public List<double> LoS_precond(List<double> x0, double eps, int maxiter)
+        {
+            int k = 1;
+            List<double> buf = MatrixMult(x0);
+            double bnorm = 0;
+            for (int i = 0; i < n; i++)
+            {
+                buf[i] = b[i] - buf[i];
+            }
+            double rnorm = Math.Sqrt(DotProduct(buf, buf));
+            List<double> r = LUDirect(buf);
+            bnorm = Math.Sqrt(DotProduct(b, b));
+            List<double> z = LUReverse(r);
+            buf = MatrixMult(z);
+            List<double> p = LUDirect(buf);
+            double resid = 1;
+            while (resid > eps && rnorm / bnorm > eps * eps && k < maxiter)
+            {
+                double pp = DotProduct(p, p);
+                double pr = DotProduct(p, r);
+                double alpha = pr / pp;
+                for (int i = 0; i < n; i++)
+                {
+                    x0[i] += alpha * z[i];
+                    r[i] -= alpha * p[i];
+                }
+                rnorm = Math.Sqrt(DotProduct(r, r));
+                List<double> Ur = LUReverse(r);
+                buf = MatrixMult(Ur);
+                buf = LUDirect(buf);
+                double betta = -(DotProduct(p, buf) / pp);
+                for (int i = 0; i < n; i++)
+                {
+                    z[i] = Ur[i] + betta * z[i];
+                    p[i] = buf[i] + betta * p[i];
+                }
+                double test1 = 0;
+                double test2 = 0;
+                var asd = MatrixMult(x0);
+                for (int i = 0; i < n; i++)
+                {
+                    test1 += (asd[i] - b[i]) * (asd[i] - b[i]);
+                    test2 += b[i] * b[i];
+                }
+                resid = Math.Sqrt(test1 / test2);
+                k++;
+            }
+            Console.WriteLine($"{k} {rnorm / bnorm} {resid}");
+            return x0;
+        }
+
         public List<double> LOS(List<double> x0, int maxiter, double eps)
         {
             double bnorm = Math.Sqrt(DotProduct(b, b));
@@ -453,15 +703,120 @@ namespace lab2
             {
                 x0.Add(0);
             }
-            return LOS(x0, 10000, 1e-15);
+            LU();
+            return LoS_precond(x0, 1e-15, 10000);
         }
-        public List<double> SolveSLAE(List<double> x0)
+    }
+    public class MatrixFull
+    {
+
+        public void Clear()
         {
+            for (int i = 0; i < dim; i++)
+            {
+                for (int j = 0; j < dim; j++)
+                {
+                    mat[i][j] = 0;
+                }
+            }
+        }
+        public List<double> Mult(List<double> x)
+        {
+            List<double> res = new();
+            for (int i = 0; i < dim; i++)
+            {
+                res.Add(0);
+            }
+            for (int i = 0; i < dim; i++)
+            {
+                for (int j = 0; j < dim; j++)
+                {
+                    res[i] += mat[i][j] * x[j];
+                }
+            }
+            return res;
+        }
+        public List<List<double>> mat = new();
+        public int dim { get; init; }
+        public MatrixFull(int n)
+        {
+            dim = n;
             for (int i = 0; i < n; i++)
             {
-                x0.Add(0);
+                mat.Add(new List<double>());
+                for (int j = 0; j < n; j++)
+                {
+                    mat[i].Add(0);
+                }
             }
-            return MSG(x0, 10000, 1e-15);
+        }
+        void LUDecomposition()
+        {
+            int n = dim;
+            for (int i = 0; i < n; i++)
+            {
+                double summd = 0;
+                for (int j = 0; j < i; j++)
+                {
+                    double summl = 0;
+                    double summu = 0;
+                    for (int k = 0; k < j; k++)
+                    {
+                        summl += mat[i][k] * mat[k][j];
+                        summu += mat[j][k] * mat[k][i];
+                    }
+                    mat[i][j] -= summl;
+                    mat[j][i] = (mat[j][i] - summu) / mat[j][j];
+                    summd += mat[i][j] * mat[j][i];
+                }
+                mat[i][i] -= summd;
+            }
+        }
+        void Gauss(List<double> b)
+        {
+            int n = dim;
+            for (int i = 0; i < n; i++)
+            {
+                double summ = 0;
+                for (int j = 0; j < i; j++)
+                {
+                    summ += mat[i][j] * b[j];
+                }
+                b[i] = (b[i] - summ) / mat[i][i];
+            }
+            for (int i = n - 1; i >= 0; i--)
+            {
+                double summ = 0;
+                for (int j = n - 1; j > i; j--)
+                {
+                    summ += mat[i][j] * b[j];
+                }
+                b[i] -= summ;
+            }
+        }
+        public List<double> SolveLU(List<double> b)
+        {
+            LUDecomposition();
+            Gauss(b);
+            return b;
+        }
+    }
+    public class Vector
+    {
+        public Vector(double x, double y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public static Vector operator +(Vector v1, Vector v2) => new Vector(v1.x + v2.x, v1.y + v2.y);
+        public static Vector operator -(Vector v1, Vector v2) => new Vector(v1.x - v2.x, v1.y - v2.y);
+        public static double operator *(Vector v1, Vector v2) => v1.x * v2.x + v1.y * v2.y;
+        public double x { get; init; }
+        public double y { get; init; }
+        public double Norm
+        {
+            get => Math.Sqrt(x * x + y * y);
         }
     }
 }

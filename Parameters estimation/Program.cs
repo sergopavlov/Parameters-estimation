@@ -85,7 +85,7 @@ namespace myns
            
 
         }
-
+        
         static double CalcV(int i, List<double> I, double sigma, List<Vector> A, List<Vector> B, List<Vector> M, List<Vector> N)
         {
             double res = 0;
