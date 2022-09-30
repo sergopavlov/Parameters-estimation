@@ -6,7 +6,6 @@ namespace lab2
 {
     internal class Program
     {
-        MFE mfe = new MFE("txt/Grid.txt", 30, 0.01, 0.01);
         static void Main(string[] args)
         {
             List<Vector> A = new();
@@ -14,9 +13,14 @@ namespace lab2
             List<Vector> M = new();
             List<Vector> N = new();
             List<double> V = new();
+            List<double> I = new();
             foreach (var item in File.ReadLines("txt/напряжения.txt"))
             {
                 V.Add(double.Parse(item));
+            }
+            foreach (var item in File.ReadLines("txt/Токи.txt"))
+            {
+                I.Add(double.Parse(item));
             }
             foreach (var item in File.ReadAllLines("txt/источники.txt"))
             {
@@ -30,66 +34,15 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MatrixFull mat = new MatrixFull(2);
-            List<double> b = new();
-            List<double> res = new();
-            for (int i = 0; i < 2; i++)
-            {
-                b.Add(0);
-                res.Add(0);
-            }
+            MFE mfe = new MFE("txt/Grid.txt", 110, 0.1, 0.16);
+            MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
+            List<double> Params = new() { 100, 0.16 };
+            GaussNewton solver = new GaussNewton(0.1, Params, F);
+            solver.Solve(100, 1e-10);
 
-            double penalty = 0;
-            for (int i = 0; i < 3; i++)
-            {
-                penalty += (CalcV(i, A, B, M, N) - V[i]) * (CalcV(i, A, B, M, N) - V[i]) / (V[i] * V[i]);
-            }
-            penalty = Math.Sqrt(penalty);
-            Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
-
-            while (penalty > 1e-14)
-            {
-
-
-                for (int i = 0; i < n; i++)
-                {
-                    for (int j = 0; j < n; j++)
-                    {
-                        for (int k = 0; k < m; k++)
-                        {
-                            mat.mat[i][j] += 1 / (V[k] * V[k] * 4 * Math.PI * Math.PI * sigma * sigma) * (1 / (B[j] - M[k]).Norm - 1 / (A[j] - M[k]).Norm - 1 / (B[j] - N[k]).Norm + 1 / (A[j] - N[k]).Norm) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm);
-                        }
-                    }
-                    b[i] = 0;
-                    for (int k = 0; k < m; k++)
-                    {
-                        b[i] += 1 / (V[k] * V[k] * 2 * Math.PI * sigma) * (1 / (B[i] - M[k]).Norm - 1 / (A[i] - M[k]).Norm - 1 / (B[i] - N[k]).Norm + 1 / (A[i] - N[k]).Norm) * (V[k] - CalcV(k, res, sigma, A, B, M, N));
-                    }
-                    mat.mat[i][i] += 1e-15;
-                }
-
-                var dres = mat.SolveLU(b);
-                for (int i = 0; i < n; i++)
-                {
-                    res[i] += dres[i];
-                }
-                mat.Clear();
-                penalty = 0;
-                for (int i = 0; i < m; i++)
-                {
-                    penalty += (CalcV(i, res, sigma, A, B, M, N) - V[i]) * (CalcV(i, res, sigma, A, B, M, N) - V[i]) / (V[i] * V[i]);
-                }
-                penalty = Math.Sqrt(penalty);
-                Console.WriteLine($"{res[0]} {res[1]} {res[2]} {penalty}");
-            }
 
         }
-        public static double CalcV(int i, List<Vector> A, List<Vector> B, List<Vector> M, List<Vector> N)
-        {
-            double res = 0;
-            res = mfe.GetSollution((B[0] - M[i]).Norm, 0) - mfe.GetSollution((A[0] - M[i]).Norm, 0) - mfe.GetSollution((B[0] - N[i]).Norm, 0) + mfe.GetSollution((A[0] - N[i]).Norm, 0);
-            return res;
-        }
+
 
     }
     public class MFE
@@ -131,7 +84,7 @@ namespace lab2
                 zgrid[i] = -rgrid[zn - i];
             }
             mat = new Matrix((rn + 1) * (zn + 1));
-            Console.WriteLine($"{rgrid[1] - rgrid[0]} {rgrid[100] - rgrid[99]}");
+            Console.WriteLine($"{rgrid[1] - rgrid[0]} {rgrid[zgrid.Count - 1] - rgrid[zgrid.Count - 2]}");
             GenerateProfile(rn, zn);
         }
         private void AddElems()
@@ -149,7 +102,7 @@ namespace lab2
                     };
                     double hr = rgrid[r + 1] - rgrid[r];
                     double hz = zgrid[z + 1] - zgrid[z];
-                    double cursigma = (zgrid[z + 1] + zgrid[z]) / 2 > h ? sigma1 : sigma2;
+                    double cursigma = (zgrid[z + 1] + zgrid[z]) / 2 > -h ? sigma1 : sigma2;
                     double[] rs = new double[] { rgrid[r], rgrid[r + 1] };
                     for (int k = 0; k < 2; k++)
                     {
@@ -303,10 +256,12 @@ namespace lab2
             mat.ia.Add(0);
             mat.ia.Add(0);
             mat.di.Add(0);
+            mat.di_LU.Add(0);
             mat.b.Add(0);
             for (int i = 1; i < dim; i++)
             {
                 mat.di.Add(0);
+                mat.di_LU.Add(0);
                 mat.b.Add(0);
                 int count = 0;
                 foreach (var item in list[i])
@@ -315,6 +270,8 @@ namespace lab2
                     {
                         mat.ja.Add(item);
                         mat.al.Add(0);
+                        mat.al_LU.Add(0);
+                        mat.au_LU.Add(0);
                         count++;
                     }
                 }
@@ -344,6 +301,7 @@ namespace lab2
             };
             double rloc = (r - rgrid[indexr]) / (rgrid[indexr + 1] - rgrid[indexr]);
             double zloc = (z - zgrid[indexz]) / (zgrid[indexz + 1] - zgrid[indexz]);
+            //Console.WriteLine($"r={r} V={q[dic[0]] * rloc * zloc + q[dic[1]] * (1 - rloc) * zloc + q[dic[2]] * rloc * (1 - zloc) + q[dic[3]] * (1 - rloc) * (1 - zloc)}");
             return q[dic[0]] * rloc * zloc + q[dic[1]] * (1 - rloc) * zloc + q[dic[2]] * rloc * (1 - zloc) + q[dic[3]] * (1 - rloc) * (1 - zloc);
         }
         private double h;
@@ -352,8 +310,9 @@ namespace lab2
             get => h;
             set
             {
+                if (h != value)
+                    IsSolved = false;
                 h = value;
-                IsSolved = false;
             }
         }
         private Matrix mat;
@@ -363,8 +322,9 @@ namespace lab2
             get => sigma1;
             set
             {
+                if (sigma1 != value)
+                    IsSolved = false;
                 sigma1 = value;
-                IsSolved = false;
             }
         }
         private double sigma2;
@@ -373,8 +333,9 @@ namespace lab2
             get => sigma2;
             set
             {
+                if (sigma2 != value)
+                    IsSolved = false;
                 sigma2 = value;
-                IsSolved = false;
             }
         }
         private List<double> q;
@@ -413,12 +374,15 @@ namespace lab2
             for (int i = 0; i < n; i++)
             {
                 di[i] = 0;
+                di_LU[i] = 0;
                 b[i] = 0;
             }
             int m = al.Count;
             for (int i = 0; i < m; i++)
             {
                 al[i] = 0;
+                al_LU[i] = 0;
+                au_LU[i] = 0;
             }
         }
         private List<double> MSG(List<double> x0, int maxiter, double eps)
@@ -462,17 +426,15 @@ namespace lab2
         public void LU()
         {
 
-            foreach (var item in di)
+            for (int i = 0; i < n; i++)
             {
-                di_LU.Add(item);
+                di_LU[i] = di[i];
             }
-            foreach (var item in al)
+            var q = al.Count;
+            for (int i = 0; i < q; i++)
             {
-                au_LU.Add(item);
-            }
-            foreach (var item in al)
-            {
-                al_LU.Add(item);
+                al_LU[i] = al[i];
+                au_LU[i] = al[i];
             }
             for (int i = 0; i < n; i++)
             {
@@ -576,6 +538,127 @@ namespace lab2
             }
             return res;
         }
+
+        public List<double> GMRES(List<double> x0, double eps, int maxiter, int depth)
+        {
+            //Q верхнетреугольная обратный 
+            //S нижнетреугольная прямой
+            int curdepth = depth;
+            double bnorm = Math.Sqrt(DotProduct(b, b));
+            List<double> x = MultU(x0);//меняем на x с волной
+
+            var r = MatrixMult(x0);
+            for (int i = 0; i < n; i++)
+            {
+                r[i] = b[i] - r[i];
+            }
+            r = LUDirect(r);//считаем невязку с волной
+
+            List<List<double>> V = new();//транспонированная
+            double[][] H = new double[depth + 1][];
+            for (int i = 0; i < depth + 1; i++)
+            {
+                H[i] = new double[depth];
+            }
+            double rnorm = Math.Sqrt(DotProduct(r, r));
+            int iter = 0;
+            while (rnorm / bnorm > eps && iter < 50)
+            {
+                curdepth = depth;
+                V.Add(new());
+                for (int i = 0; i < n; i++)
+                {
+                    V[0].Add(r[i] / rnorm);// добавляем первый вектор в матрицу V
+                }
+                for (int i = 0; i < depth; i++)// заполняется матрица H
+                {
+                    List<double> w = LUReverse(V[i]);
+                    w = MatrixMult(w);
+                    w = LUDirect(w);
+                    for (int j = 0; j <= i; j++)
+                    {
+                        H[j][i] = DotProduct(V[j], w);
+                    }
+                    for (int j = 0; j <= i; j++)
+                    {
+                        for (int k = 0; k < n; k++)
+                        {
+                            w[k] -= H[j][i] * V[j][k];
+                        }
+                    }
+
+                    H[i + 1][i] = Math.Sqrt(DotProduct(w, w));
+                    if (H[i + 1][i] == 0)// если новый вектор нулевой заканчиваем заполнение матриц
+                    {
+                        curdepth = i + 1;
+                        break;
+                    }
+                    else
+                    {
+                        V.Add(new());
+                        for (int k = 0; k < n; k++)
+                        {
+                            V[i + 1].Add(w[k] / H[i + 1][i]);//если ненулевой добавляем в матрицу V
+                        }
+                    }
+                }
+                List<double> d = new();//дальше будет минимизация d-Hz
+                d.Add(rnorm);
+                for (int i = 1; i < curdepth + 1; i++)
+                {
+                    d.Add(0);
+                }
+                for (int i = 0; i < curdepth; i++)//умножаем правую часть и матрицу на матрицу поворота чтобы убрать диагональ под главной
+                {
+                    double norm = Math.Sqrt(H[i][i] * H[i][i] + H[i + 1][i] * H[i + 1][i]);
+                    double c = H[i][i] / norm;
+                    double s = H[i + 1][i] / norm;
+                    for (int k = i; k < curdepth; k++)
+                    {
+                        double ii = c * H[i][k] + s * H[i + 1][k];
+                        double i1i = -s * H[i][k] + c * H[i + 1][k];
+                        H[i][k] = ii;
+                        H[i + 1][k] = i1i;
+                    }
+                    double d1 = d[i] * c + d[i + 1] * s;
+                    double d2 = -s * d[i] + c * d[i + 1];
+                    d[i] = d1;
+                    d[i + 1] = d2;
+                }
+
+                for (int i = curdepth - 1; i >= 0; i--)//обратный гаус для матрицы H верхнетреугольной
+                {
+                    double summ = 0;
+                    for (int j = curdepth - 1; j > i; j--)
+                    {
+                        summ += d[j] * H[i][j];
+                    }
+                    d[i] = (d[i] - summ) / H[i][i];
+                }
+
+                for (int i = 0; i < n; i++)//делаем добавку в x
+                {
+                    for (int j = 0; j < curdepth; j++)
+                    {
+                        x[i] += V[j][i] * d[j];
+                    }
+                }
+
+                r = LUReverse(x);
+                r = MatrixMult(r);
+                for (int i = 0; i < n; i++)
+                {
+                    r[i] = b[i] - r[i];
+                }
+                r = LUDirect(r);
+                rnorm = Math.Sqrt(DotProduct(r, r));
+                iter++;
+                V.Clear();
+            }
+            Console.WriteLine($"{iter} {rnorm / bnorm}");
+            return LUReverse(x);
+        }
+
         public List<double> LoS_precond(List<double> x0, double eps, int maxiter)
         {
             int k = 1;
@@ -592,7 +675,7 @@ namespace lab2
             buf = MatrixMult(z);
             List<double> p = LUDirect(buf);
             double resid = 1;
-            while (resid > eps && rnorm / bnorm > eps * eps && k < maxiter)
+            while (resid > eps && k < maxiter)
             {
                 double pp = DotProduct(p, p);
                 double pr = DotProduct(p, r);
@@ -817,6 +900,153 @@ namespace lab2
         public double Norm
         {
             get => Math.Sqrt(x * x + y * y);
+        }
+    }
+    public abstract class Function
+    {
+        public int n;//количество точек в которых были измерения
+        public List<double> V;//Значения измерений
+
+        protected Function(int n, List<double> v)
+        {
+            this.n = n;
+            V = v;
+        }
+
+        public abstract double Calc(List<double> Params);
+        public abstract double CalcVi(List<double> Params, int i);
+    }
+    public class MFEFunction : Function
+    {
+        List<Vector> A;
+        List<Vector> B;
+        List<Vector> M;
+        List<Vector> N;
+        List<double> I;
+        public MFE mfe;
+
+        public MFEFunction(List<Vector> A, List<Vector> B, List<Vector> M, List<Vector> N, List<double> I, MFE mfe, int n, List<double> V) : base(n, V)
+        {
+            this.A = A;
+            this.B = B;
+            this.M = M;
+            this.N = N;
+            this.I = I;
+            this.mfe = mfe;
+        }
+
+        public override double Calc(List<double> Params)
+        {
+            mfe.H = Params[0];
+            mfe.Sigma2 = Params[1];
+            double res = 0;
+            int priem = M.Count;
+            int istok = A.Count;
+            for (int i = 0; i < priem; i++)
+            {
+                double curV = 0;
+                for (int j = 0; j < istok; j++)
+                {
+                    curV += I[j] * (mfe.GetSollution((B[j] - M[i]).Norm, 0) - mfe.GetSollution((A[j] - M[i]).Norm, 0) - mfe.GetSollution((B[j] - N[i]).Norm, 0) + mfe.GetSollution((A[j] - N[i]).Norm, 0));
+                }
+                res += ((curV - V[i]) / V[i]) * ((curV - V[i]) / V[i]);
+            }
+            return res;
+        }
+
+        public override double CalcVi(List<double> Params, int i)
+        {
+            mfe.Sigma2 = Params[1];
+            mfe.H = Params[0];
+            int istok = A.Count;
+            double curV = 0;
+            for (int j = 0; j < istok; j++)
+            {
+                curV += I[j] * (mfe.GetSollution((B[j] - M[i]).Norm, 0) - mfe.GetSollution((A[j] - M[i]).Norm, 0) - mfe.GetSollution((B[j] - N[i]).Norm, 0) + mfe.GetSollution((A[j] - N[i]).Norm, 0));
+            }
+            return curV;
+        }
+    }
+    public class GaussNewton
+    {
+        public double diffparameter;
+        public List<double> Params;
+        Function F;
+
+        public GaussNewton(double diffparameter, List<double> @params, Function f)
+        {
+            this.diffparameter = diffparameter;
+            Params = @params;
+            F = f;
+        }
+
+        public List<double> Solve(int maxiter, double eps)
+        {
+            List<double> weights = new();
+            for (int i = 0; i < F.n; i++)
+            {
+                weights.Add(1 / F.V[i]);
+            }
+            int n = Params.Count;
+            MatrixFull mat = new MatrixFull(n);
+            List<double> b = new();
+            for (int i = 0; i < n; i++)
+            {
+                b.Add(0);
+            }
+            double penalty = F.Calc(Params);
+            int k = 0;
+            while (penalty > eps && k < maxiter)
+            {
+                double[][] diffs = new double[F.n][];
+                double[] V0 = new double[F.n];
+                for (int i = 0; i < F.n; i++)
+                {
+                    V0[i] = F.CalcVi(Params, i);
+                    diffs[i] = new double[n];
+                }
+
+                for (int i = 0; i < n; i++)
+                {
+                    double delta = Params[i] * diffparameter;
+                    Params[i] += delta;
+                    for (int s = 0; s < F.n; s++)
+                    {
+                        diffs[s][i] = F.CalcVi(Params, i);
+                        diffs[s][i] = (diffs[s][i] - V0[s]) / delta;
+                    }
+                    Params[i] -= delta;
+
+                }
+
+                for (int s = 0; s < F.n; s++)
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        b[i] += weights[s] * weights[s] * diffs[s][i] * (F.V[s] - V0[s]);
+                        for (int j = 0; j < n; j++)
+                        {
+                            mat.mat[i][j] += weights[s] * weights[s] * diffs[s][i] * diffs[s][j];
+                        }
+                    }
+                }
+                for (int i = 0; i < n; i++)
+                {
+                    mat.mat[i][i] += 1e-5;
+                }
+                //добавить регуляризацию
+                var dparam = mat.SolveLU(b);
+                mat.Clear();
+                for (int i = 0; i < n; i++)
+                {
+                    Params[i] += dparam[i];
+                    b[i] = 0;
+                }
+                penalty = F.Calc(Params);
+                Console.WriteLine($"{penalty} {(F as MFEFunction).mfe.Sigma2 } {(F as MFEFunction).mfe.H }");
+                k++;
+            }
+            return Params;
         }
     }
 }
