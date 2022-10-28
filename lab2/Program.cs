@@ -34,7 +34,16 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 110, 0.1, 0.16);
+            MFE mfe = new MFE("txt/Grid.txt", 10, 1, 1);
+            mfe.BoundaryLeft = (x) => 0;
+            mfe.BoundaryRight = (x) => 0;
+            mfe.BoundaryTop = (x) => 0;
+            mfe.BoundaryBot = (x) => 0;
+            mfe.BoundaryTypeLeft = 2;
+            mfe.BoundaryTypeRight = 1;
+            mfe.BoundaryTypeTop = 2;
+            mfe.BoundaryTypeBot = 1;
+            mfe.Solve();
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
             List<double> Params = new() { 100, 0.16 };
             GaussNewton solver = new GaussNewton(0.1, Params, F);
@@ -79,10 +88,10 @@ namespace lab2
             {
                 zgrid.Add(zgrid[i] + zl);
             }
-            for (int i = 0; i <= zn; i++)
+            /*for (int i = 0; i <= zn; i++)
             {
                 zgrid[i] = -rgrid[zn - i];
-            }
+            }*/
             mat = new Matrix((rn + 1) * (zn + 1));
             Console.WriteLine($"{rgrid[1] - rgrid[0]} {rgrid[zgrid.Count - 1] - rgrid[zgrid.Count - 2]}");
             GenerateProfile(rn, zn);
@@ -119,63 +128,139 @@ namespace lab2
                             }
                         }
                     }
-                    if (z == zn - 1 && r == 0)
-                    {
-                        mat.b[r + (rn + 1) * (z + 1)] += 1 / 2.0 / Math.PI;
-                    }
                 }
             }
+            mat.b[(rn + 1) * (zn)] += 1 / 2.0 * Math.PI;
         }
         private void AddBoundary()
         {
 
-
-            for (int r = 0; r <= rn; r++)
+            if (BoundaryTypeBot == 1)
             {
-                mat.di[r] = 1;
-                mat.b[r] = 0;
-                for (int k = mat.ia[r]; k < mat.ia[r + 1]; k++)
+                for (int r = 0; r <= rn; r++)
                 {
-                    //mat.b[mat.ja[k]] -= mat.al[k];
-                    mat.al[k] = 0;
-                }
-                for (int i = r + 1; i < mat.n; i++)
-                {
-                    int k = mat.ia[i];
-                    while (mat.ja[k] < r && k < mat.ia[i + 1] - 1)
+                    var value = BoundaryBot(rgrid[r]);
+                    mat.di[r] = 1;
+                    mat.b[r] = value;
+                    for (int k = mat.ia[r]; k < mat.ia[r + 1]; k++)
                     {
-                        k++;
-                    }
-                    if (mat.ja[k] == r)
-                    {
-                        //mat.b[i] -= mat.al[k];
+                        mat.b[mat.ja[k]] -= mat.al[k] * value;
                         mat.al[k] = 0;
+                    }
+                    for (int i = r + 1; i < mat.n; i++)
+                    {
+                        int k = mat.ia[i];
+                        while (mat.ja[k] < r && k < mat.ia[i + 1] - 1)
+                        {
+                            k++;
+                        }
+                        if (mat.ja[k] == r)
+                        {
+                            mat.b[i] -= mat.al[k] * value;
+                            mat.al[k] = 0;
+                        }
                     }
                 }
             }
-            for (int z = 0; z <= zn; z++)
+            else
             {
-                int index = rn + (rn + 1) * z;
-                mat.di[index] = 1;
-                mat.b[index] = 0;
-                for (int k = mat.ia[index]; k < mat.ia[index + 1]; k++)
+                //2 краевые низ
+            }
+            if (BoundaryTypeRight == 1)
+            {
+                for (int z = 0; z <= zn; z++)
                 {
-                    //mat.b[mat.ja[k]] -= mat.al[k];
-                    mat.al[k] = 0;
-                }
-                for (int i = index + 1; i < mat.n; i++)
-                {
-                    int k = mat.ia[i];
-                    while (mat.ja[k] < index && k < mat.ia[i + 1] - 1)
+                    var value = BoundaryRight(zgrid[z]);
+                    int index = rn + (rn + 1) * z;
+                    mat.di[index] = 1;
+                    mat.b[index] = value;
+                    for (int k = mat.ia[index]; k < mat.ia[index + 1]; k++)
                     {
-                        k++;
-                    }
-                    if (mat.ja[k] == index)
-                    {
-                        //mat.b[i] -= mat.al[k];
+                        mat.b[mat.ja[k]] -= mat.al[k] * value;
                         mat.al[k] = 0;
                     }
+                    for (int i = index + 1; i < mat.n; i++)
+                    {
+                        int k = mat.ia[i];
+                        while (mat.ja[k] < index && k < mat.ia[i + 1] - 1)
+                        {
+                            k++;
+                        }
+                        if (mat.ja[k] == index)
+                        {
+                            mat.b[i] -= mat.al[k] * value;
+                            mat.al[k] = 0;
+                        }
+                    }
                 }
+            }
+            else
+            {
+                //2 краевые право
+            }
+            if (BoundaryTypeTop == 1)
+            {
+                for (int r = 0; r <= rn; r++)
+                {
+                    var value = BoundaryTop(rgrid[r]);
+                    int index = zn * (rn + 1) + r;
+                    mat.di[index] = 1;
+                    mat.b[index] = value;
+                    for (int k = mat.ia[index]; k < mat.ia[index + 1]; k++)
+                    {
+                        mat.b[mat.ja[k]] -= mat.al[k] * value;
+                        mat.al[k] = 0;
+                    }
+                    for (int i = index + 1; i < mat.n; i++)
+                    {
+                        int k = mat.ia[i];
+                        while (mat.ja[k] < index && k < mat.ia[i + 1] - 1)
+                        {
+                            k++;
+                        }
+                        if (mat.ja[k] == index)
+                        {
+                            mat.b[i] -= mat.al[k] * value;
+                            mat.al[k] = 0;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                //2 краевые верх
+            }
+            if (BoundaryTypeLeft == 1)
+            {
+                for (int z = 0; z <= zn; z++)
+                {
+                    var value = BoundaryLeft(zgrid[z]);
+                    int index = (rn + 1) * z;
+                    mat.di[index] = 1;
+                    mat.b[index] = value;
+                    for (int k = mat.ia[index]; k < mat.ia[index + 1]; k++)
+                    {
+                        mat.b[mat.ja[k]] -= mat.al[k] * value;
+                        mat.al[k] = 0;
+                    }
+                    for (int i = index + 1; i < mat.n; i++)
+                    {
+                        int k = mat.ia[i];
+                        while (mat.ja[k] < index && k < mat.ia[i + 1] - 1)
+                        {
+                            k++;
+                        }
+                        if (mat.ja[k] == index)
+                        {
+                            mat.b[i] -= mat.al[k] * value;
+                            mat.al[k] = 0;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                //2 краевые лево
             }
         }
         private int rn;
@@ -317,6 +402,14 @@ namespace lab2
         }
         private Matrix mat;
         private double sigma1;
+        public int BoundaryTypeTop = 1;
+        public int BoundaryTypeBot = 1;
+        public int BoundaryTypeLeft = 1;
+        public int BoundaryTypeRight = 1;
+        public Func<double, double> BoundaryTop = (x) => 0;
+        public Func<double, double> BoundaryBot = (x) => 0;
+        public Func<double, double> BoundaryLeft = (x) => 0;
+        public Func<double, double> BoundaryRight = (x) => 0;
         public double Sigma1
         {
             get => sigma1;
@@ -787,7 +880,7 @@ namespace lab2
                 x0.Add(0);
             }
             LU();
-            return LoS_precond(x0, 1e-15, 10000);
+            return LoS_precond(x0, 1e-14, 10000);
         }
     }
     public class MatrixFull

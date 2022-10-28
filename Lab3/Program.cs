@@ -31,7 +31,7 @@
                      }
                      res += (p1 - p2) * (p1 - p2);
                  }
-                 return res;
+                 return Math.Sqrt(res);
              };
             GeneticProblem problem = new GeneticProblem(f, 30000, 11, 0.15, 0.05);
             problem.Solve(10000, 1e-10);
@@ -169,8 +169,8 @@
             for (int i = 0; i < populationSize; i++)
             {
                 Fs[i] = func(population[i]);
-                probs[i + 1] = 1/Fs[i];
-                summ += 1/Fs[i];
+                probs[i + 1] = 1 / Fs[i];
+                summ += 1 / Fs[i];
                 summ1 += Fs[i];
                 if (Fs[i] < Fs[index])
                     index = i;
