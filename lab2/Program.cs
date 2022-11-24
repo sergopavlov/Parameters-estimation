@@ -34,7 +34,7 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 10, 1, 1);
+            MFE mfe = new MFE("txt/Grid.txt", 200, 0.1, 0.2);
             mfe.BoundaryLeft = (x) => 0;
             mfe.BoundaryRight = (x) => 0;
             mfe.BoundaryTop = (x) => 0;
@@ -43,7 +43,6 @@ namespace lab2
             mfe.BoundaryTypeRight = 1;
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
-            mfe.Solve();
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
             List<double> Params = new() { 100, 0.16 };
             GaussNewton solver = new GaussNewton(0.1, Params, F);
@@ -88,10 +87,10 @@ namespace lab2
             {
                 zgrid.Add(zgrid[i] + zl);
             }
-            /*for (int i = 0; i <= zn; i++)
+            for (int i = 0; i <= zn; i++)
             {
                 zgrid[i] = -rgrid[zn - i];
-            }*/
+            }
             mat = new Matrix((rn + 1) * (zn + 1));
             Console.WriteLine($"{rgrid[1] - rgrid[0]} {rgrid[zgrid.Count - 1] - rgrid[zgrid.Count - 2]}");
             GenerateProfile(rn, zn);
@@ -130,7 +129,7 @@ namespace lab2
                     }
                 }
             }
-            mat.b[(rn + 1) * (zn)] += 1 / 2.0 * Math.PI;
+            mat.b[(rn + 1) * (zn)] += 1 / (2.0 * Math.PI);
         }
         private void AddBoundary()
         {
@@ -267,6 +266,25 @@ namespace lab2
         private int zn;
         private static class Matrices
         {
+            public static double[][][] GMatr = new double[2][][]
+            {
+                new double[4][]
+                {
+                    new double[4]{5.0/12,-1.0/12,-1.0/6,-1.0/6},//x y  x
+                    new double[4]{-1.0/12,1.0/4,-1.0/6,0 },//1-x y x
+                    new double[4]{-1.0/6,-1.0/6,5.0/12,-1.0/12},//1-y x x
+                    new double[4]{ -1.0 / 6,0,-1.0/12,1.0/4 }//1-y 1-x x
+                },
+                new double[4][]
+                {
+                    new double[4]{1.0/4,-1.0/12,0,-1.0/6},//x y 1-x
+                    new double[4]{-1.0/12,5.0/12,-1.0/6,-1.0/6},//1-x y 1-x
+                    new double[4]{0,-1.0/6,1.0/4,-1.0/12},
+                    new double[4]{-1.0/6,-1.0/6,-1.0/12,5.0/12}
+                }
+            };
+
+
             public static double[][][] GR = new double[][][]
             {
                 new double[][]
@@ -655,7 +673,7 @@ namespace lab2
             }
             double rnorm = Math.Sqrt(DotProduct(r, r));
             int iter = 0;
-            while (rnorm / bnorm > eps && iter < 50)
+            while (rnorm / bnorm > eps && iter < maxiter)
             {
                 curdepth = depth;
                 V.Add(new());
@@ -880,7 +898,7 @@ namespace lab2
                 x0.Add(0);
             }
             LU();
-            return LoS_precond(x0, 1e-14, 10000);
+            return GMRES(x0, 1e-12, 1000,30);
         }
     }
     public class MatrixFull
