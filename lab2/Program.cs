@@ -34,7 +34,7 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 200, 0.1, 0.2);
+            MFE mfe = new MFE("txt/Grid.txt", 50, 0.1, 0.01);
             mfe.BoundaryLeft = (x) => 0;
             mfe.BoundaryRight = (x) => 0;
             mfe.BoundaryTop = (x) => 0;
@@ -44,7 +44,7 @@ namespace lab2
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
-            List<double> Params = new() { 100, 0.16 };
+            List<double> Params = new() { 50, 0.1 };
             GaussNewton solver = new GaussNewton(0.1, Params, F);
             solver.Solve(100, 1e-10);
 
