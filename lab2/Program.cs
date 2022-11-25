@@ -43,8 +43,12 @@ namespace lab2
             mfe.BoundaryTypeRight = 1;
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
+            mfe.Solve();
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
-            List<double> Params = new() { 50, 0.1 };
+            List<double> Params = new() { 50, 0.01 };
+            var asd1 = F.CalcVi(Params, 0);
+            var asd2 = F.CalcVi(Params, 1);
+            var asd3 = F.CalcVi(Params, 2);
             GaussNewton solver = new GaussNewton(0.1, Params, F);
             solver.Solve(100, 1e-10);
 
@@ -61,35 +65,15 @@ namespace lab2
             this.sigma1 = sigma1;
             this.sigma2 = sigma2;
             var text = File.ReadAllLines(Grid);
-            var cur = text[0].Split(' ');
-            var r0 = double.Parse(cur[0]);
-            var r1 = double.Parse(cur[1]);
-            rn = int.Parse(cur[2]);
-            var rq = double.Parse(cur[3]);
-            var rl = (r1 - r0) * (1 - rq) / (1 - Math.Pow(rq, rn));
-            if (rq == 1)
-                rl = (r1 - r0) / rn;
-            rgrid.Add(r0);
-            for (int i = 0; i < rn; i++, rl *= rq)
+            rn = text.Length-1;
+            for (int i = 0; i < text.Length; i++)
             {
-                rgrid.Add(rgrid[i] + rl);
+                rgrid.Add(double.Parse(text[i]));
             }
-            cur = text[1].Split(' ');
-            var z0 = double.Parse(cur[0]);
-            var z1 = double.Parse(cur[1]);
-            zn = int.Parse(cur[2]);
-            var zq = double.Parse(cur[3]);
-            var zl = (z1 - z0) * (1 - zq) / (1 - Math.Pow(zq, zn));
-            if (zq == 1)
-                zl = (z1 - z0) / zn;
-            zgrid.Add(z0);
-            for (int i = 0; i < zn; i++, zl *= zq)
-            {
-                zgrid.Add(zgrid[i] + zl);
-            }
+            zn = rn;
             for (int i = 0; i <= zn; i++)
             {
-                zgrid[i] = -rgrid[zn - i];
+                zgrid.Add(-rgrid[zn - i]);
             }
             mat = new Matrix((rn + 1) * (zn + 1));
             Console.WriteLine($"{rgrid[1] - rgrid[0]} {rgrid[zgrid.Count - 1] - rgrid[zgrid.Count - 2]}");
@@ -765,7 +749,7 @@ namespace lab2
                 rnorm = Math.Sqrt(DotProduct(r, r));
                 iter++;
                 V.Clear();
-            }
+             }
             Console.WriteLine($"{iter} {rnorm / bnorm}");
             return LUReverse(x);
         }
