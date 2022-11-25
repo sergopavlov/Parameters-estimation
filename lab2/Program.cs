@@ -34,7 +34,7 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 50, 0.1, 0.01);
+            MFE mfe = new MFE("txt/Grid.txt", 10.1, 0.1, 1);
             mfe.BoundaryLeft = (x) => 0;
             mfe.BoundaryRight = (x) => 0;
             mfe.BoundaryTop = (x) => 0;
@@ -43,12 +43,11 @@ namespace lab2
             mfe.BoundaryTypeRight = 1;
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
-            mfe.Solve();
-            MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=50 sigma1 =0.1 sigma2=0.01
-            List<double> Params = new() { 50, 0.01 };
-            var asd1 = F.CalcVi(Params, 0);
-            var asd2 = F.CalcVi(Params, 1);
-            var asd3 = F.CalcVi(Params, 2);
+            MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=10 sigma1 =0.1 sigma2=1
+            List<double> Params = new() { 10.1, 1 };
+            var asd1 =F.CalcVi(Params, 0);
+            var asd2 =F.CalcVi(Params, 1);
+            var asd3 =F.CalcVi(Params, 2);
             GaussNewton solver = new GaussNewton(0.1, Params, F);
             solver.Solve(100, 1e-10);
 
@@ -65,7 +64,7 @@ namespace lab2
             this.sigma1 = sigma1;
             this.sigma2 = sigma2;
             var text = File.ReadAllLines(Grid);
-            rn = text.Length-1;
+            rn = text.Length - 1;
             for (int i = 0; i < text.Length; i++)
             {
                 rgrid.Add(double.Parse(text[i]));
@@ -434,8 +433,8 @@ namespace lab2
             }
         }
         private List<double> q;
-        private List<double> rgrid = new();
-        private List<double> zgrid = new();
+        public List<double> rgrid = new();
+        public List<double> zgrid = new();
         public void Solve()
         {
             if (IsSolved)
@@ -749,7 +748,7 @@ namespace lab2
                 rnorm = Math.Sqrt(DotProduct(r, r));
                 iter++;
                 V.Clear();
-             }
+            }
             Console.WriteLine($"{iter} {rnorm / bnorm}");
             return LUReverse(x);
         }
@@ -882,7 +881,7 @@ namespace lab2
                 x0.Add(0);
             }
             LU();
-            return GMRES(x0, 1e-12, 1000,30);
+            return GMRES(x0, 1e-12, 1000, 30);
         }
     }
     public class MatrixFull
@@ -1103,7 +1102,17 @@ namespace lab2
 
                 for (int i = 0; i < n; i++)
                 {
-                    double delta = Params[i] * diffparameter;
+                    double delta;
+                    if (i == 0)
+                    {
+                        var grid = (F as MFEFunction).mfe.zgrid;
+                        int index = grid.Count() - 1;
+                        while (-grid[index] < Params[i])
+                            index--;
+                        delta = -(grid[index] * 0.4 + grid[index - 1] * 0.6) - Params[i];
+                    }
+                    else
+                        delta = Params[i] * diffparameter;
                     Params[i] += delta;
                     for (int s = 0; s < F.n; s++)
                     {
@@ -1138,7 +1147,7 @@ namespace lab2
                     b[i] = 0;
                 }
                 penalty = F.Calc(Params);
-                Console.WriteLine($"{penalty} {(F as MFEFunction).mfe.Sigma2 } {(F as MFEFunction).mfe.H }");
+                Console.WriteLine($"{penalty} {(F as MFEFunction).mfe.Sigma2} {(F as MFEFunction).mfe.H}");
                 k++;
             }
             return Params;
