@@ -34,7 +34,7 @@ namespace lab2
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 10.1, 0.1, 1);
+            MFE mfe = new MFE("txt/Grid.txt", 20, 1, 1);
             mfe.BoundaryLeft = (x) => 0;
             mfe.BoundaryRight = (x) => 0;
             mfe.BoundaryTop = (x) => 0;
@@ -43,13 +43,13 @@ namespace lab2
             mfe.BoundaryTypeRight = 1;
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
-            MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);//истинные значения h=10 sigma1 =0.1 sigma2=1
-            List<double> Params = new() { 10.1, 1 };
-            var asd1 =F.CalcVi(Params, 0);
-            var asd2 =F.CalcVi(Params, 1);
-            var asd3 =F.CalcVi(Params, 2);
+            MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);
+            List<double> Params = new() { 0.5 };//истинные 0,8 0,5
+            var asd1 = F.CalcVi(Params, 0);
+            var asd2 = F.CalcVi(Params, 1);
+            var asd3 = F.CalcVi(Params, 2);
             GaussNewton solver = new GaussNewton(0.1, Params, F);
-            solver.Solve(100, 1e-10);
+            solver.Solve(300, 1e-10);
 
 
         }
@@ -102,7 +102,6 @@ namespace lab2
                             mat.di[dic[i]] += cursigma * rs[k] * (hz / hr * Matrices.GR[k][i % 2][i % 2] * Matrices.MZ[i / 2][i / 2] + hr / hz * Matrices.MR[k][i % 2][i % 2] * Matrices.GZ[i / 2][i / 2]);
                             for (int j = 0; j < i; j++)
                             {
-                                //mat.b[dic[i]] += hz * hr * Matrices.MR[i%2][j%2][k]*Matrices.MZ[i/2][j/2];
                                 int index = mat.ia[dic[i]];
                                 while (mat.ja[index] < dic[j])
                                     index++;
@@ -881,7 +880,7 @@ namespace lab2
                 x0.Add(0);
             }
             LU();
-            return GMRES(x0, 1e-12, 1000, 30);
+            return GMRES(x0, 1e-14, 1000, 30);
         }
     }
     public class MatrixFull
@@ -1031,8 +1030,8 @@ namespace lab2
 
         public override double Calc(List<double> Params)
         {
-            mfe.H = Params[0];
-            mfe.Sigma2 = Params[1];
+            mfe.Sigma1 = Params[0];
+            mfe.Sigma2 = Params[0];
             double res = 0;
             int priem = M.Count;
             int istok = A.Count;
@@ -1050,8 +1049,8 @@ namespace lab2
 
         public override double CalcVi(List<double> Params, int i)
         {
-            mfe.Sigma2 = Params[1];
-            mfe.H = Params[0];
+            mfe.Sigma2 = Params[0];
+            mfe.Sigma1 = Params[0];
             int istok = A.Count;
             double curV = 0;
             for (int j = 0; j < istok; j++)
@@ -1103,16 +1102,7 @@ namespace lab2
                 for (int i = 0; i < n; i++)
                 {
                     double delta;
-                    if (i == 0)
-                    {
-                        var grid = (F as MFEFunction).mfe.zgrid;
-                        int index = grid.Count() - 1;
-                        while (-grid[index] < Params[i])
-                            index--;
-                        delta = -(grid[index] * 0.4 + grid[index - 1] * 0.6) - Params[i];
-                    }
-                    else
-                        delta = Params[i] * diffparameter;
+                    delta = Params[i] * diffparameter;
                     Params[i] += delta;
                     for (int s = 0; s < F.n; s++)
                     {
@@ -1127,7 +1117,7 @@ namespace lab2
                 {
                     for (int i = 0; i < n; i++)
                     {
-                        b[i] += weights[s] * weights[s] * diffs[s][i] * (F.V[s] - V0[s]);
+                        b[i] -= weights[s] * weights[s] * diffs[s][i] * (F.V[s] - V0[s]);
                         for (int j = 0; j < n; j++)
                         {
                             mat.mat[i][j] += weights[s] * weights[s] * diffs[s][i] * diffs[s][j];
@@ -1136,7 +1126,7 @@ namespace lab2
                 }
                 for (int i = 0; i < n; i++)
                 {
-                    mat.mat[i][i] += 1e-5;
+                   mat.mat[i][i] += 1e-8;
                 }
                 //добавить регуляризацию
                 var dparam = mat.SolveLU(b);
@@ -1147,7 +1137,7 @@ namespace lab2
                     b[i] = 0;
                 }
                 penalty = F.Calc(Params);
-                Console.WriteLine($"{penalty} {(F as MFEFunction).mfe.Sigma2} {(F as MFEFunction).mfe.H}");
+                Console.WriteLine($"{penalty} {(F as MFEFunction).mfe.Sigma1} {(F as MFEFunction).mfe.Sigma2}");
                 k++;
             }
             return Params;
