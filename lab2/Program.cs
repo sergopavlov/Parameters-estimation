@@ -14,27 +14,27 @@ namespace lab2
             List<Vector> N = new();
             List<double> V = new();
             List<double> I = new();
-            foreach (var item in File.ReadLines("txt/напряжения.txt"))
+            foreach (var item in File.ReadLines("../../../txt/напряжения.txt"))
             {
                 V.Add(double.Parse(item));
             }
-            foreach (var item in File.ReadLines("txt/Токи.txt"))
+            foreach (var item in File.ReadLines("../../../txt/Токи.txt"))
             {
                 I.Add(double.Parse(item));
             }
-            foreach (var item in File.ReadAllLines("txt/источники.txt"))
+            foreach (var item in File.ReadAllLines("../../../txt/источники.txt"))
             {
                 var cur = item.Split(' ');
                 A.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 B.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            foreach (var item in File.ReadAllLines("txt/приемники.txt"))
+            foreach (var item in File.ReadAllLines("../../../txt/приемники.txt"))
             {
                 var cur = item.Split(' ');
                 M.Add(new Vector(double.Parse(cur[0]), double.Parse(cur[1])));
                 N.Add(new Vector(double.Parse(cur[2]), double.Parse(cur[3])));
             }
-            MFE mfe = new MFE("txt/Grid.txt", 20, 1, 1);
+            MFE mfe = new MFE("../../../txt/Grid.txt", 20, 0.01, 0.1);
             mfe.BoundaryLeft = (x) => 0;
             mfe.BoundaryRight = (x) => 0;
             mfe.BoundaryTop = (x) => 0;
@@ -44,12 +44,12 @@ namespace lab2
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);
-            List<double> Params = new() { 0.5 };//истинные 0,8 0,5
+            List<double> Params = new() { 0.8, 0.5 };//истинные 0,8 0,5
             var asd1 = F.CalcVi(Params, 0);
             var asd2 = F.CalcVi(Params, 1);
             var asd3 = F.CalcVi(Params, 2);
             GaussNewton solver = new GaussNewton(0.1, Params, F);
-            solver.Solve(300, 1e-10);
+            solver.Solve(100000, 1e-10);
 
 
         }
@@ -880,7 +880,7 @@ namespace lab2
                 x0.Add(0);
             }
             LU();
-            return GMRES(x0, 1e-14, 1000, 30);
+            return GMRES(x0, 1e-13, 1000, 30);
         }
     }
     public class MatrixFull
@@ -1031,7 +1031,7 @@ namespace lab2
         public override double Calc(List<double> Params)
         {
             mfe.Sigma1 = Params[0];
-            mfe.Sigma2 = Params[0];
+            mfe.Sigma2 = Params[1];
             double res = 0;
             int priem = M.Count;
             int istok = A.Count;
@@ -1041,6 +1041,7 @@ namespace lab2
                 for (int j = 0; j < istok; j++)
                 {
                     curV += I[j] * (mfe.GetSollution((B[j] - M[i]).Norm, 0) - mfe.GetSollution((A[j] - M[i]).Norm, 0) - mfe.GetSollution((B[j] - N[i]).Norm, 0) + mfe.GetSollution((A[j] - N[i]).Norm, 0));
+                    //curV += I[j] / (2 * Math.PI * Params[0]) * (1 / ((B[j] - M[i]).Norm) - 1 / ((A[j] - M[i]).Norm) - 1 / ((B[j] - N[i]).Norm) + 1 / ((A[j] - N[i]).Norm));
                 }
                 res += ((curV - V[i]) / V[i]) * ((curV - V[i]) / V[i]);
             }
@@ -1049,13 +1050,14 @@ namespace lab2
 
         public override double CalcVi(List<double> Params, int i)
         {
-            mfe.Sigma2 = Params[0];
             mfe.Sigma1 = Params[0];
+            mfe.Sigma2 = Params[1];
             int istok = A.Count;
             double curV = 0;
             for (int j = 0; j < istok; j++)
             {
                 curV += I[j] * (mfe.GetSollution((B[j] - M[i]).Norm, 0) - mfe.GetSollution((A[j] - M[i]).Norm, 0) - mfe.GetSollution((B[j] - N[i]).Norm, 0) + mfe.GetSollution((A[j] - N[i]).Norm, 0));
+                //curV += I[j] / (2 * Math.PI * Params[0]) * (1 / ((B[j] - M[i]).Norm) - 1 / ((A[j] - M[i]).Norm) - 1 / ((B[j] - N[i]).Norm) + 1 / ((A[j] - N[i]).Norm));
             }
             return curV;
         }
@@ -1106,7 +1108,7 @@ namespace lab2
                     Params[i] += delta;
                     for (int s = 0; s < F.n; s++)
                     {
-                        diffs[s][i] = F.CalcVi(Params, i);
+                        diffs[s][i] = F.CalcVi(Params, s);
                         diffs[s][i] = (diffs[s][i] - V0[s]) / delta;
                     }
                     Params[i] -= delta;
@@ -1117,7 +1119,7 @@ namespace lab2
                 {
                     for (int i = 0; i < n; i++)
                     {
-                        b[i] -= weights[s] * weights[s] * diffs[s][i] * (F.V[s] - V0[s]);
+                        b[i] -= weights[s] * weights[s] * diffs[s][i] * (V0[s] - F.V[s]);
                         for (int j = 0; j < n; j++)
                         {
                             mat.mat[i][j] += weights[s] * weights[s] * diffs[s][i] * diffs[s][j];
@@ -1126,7 +1128,7 @@ namespace lab2
                 }
                 for (int i = 0; i < n; i++)
                 {
-                   mat.mat[i][i] += 1e-8;
+                    mat.mat[i][i] += 1e-8;
                 }
                 //добавить регуляризацию
                 var dparam = mat.SolveLU(b);
