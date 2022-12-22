@@ -44,12 +44,12 @@ namespace lab2
             mfe.BoundaryTypeTop = 2;
             mfe.BoundaryTypeBot = 1;
             MFEFunction F = new MFEFunction(A, B, M, N, I, mfe, M.Count, V);
-            List<double> Params = new() { 0.8, 0.5 };//истинные 0,8 0,5
-            var asd1 = F.CalcVi(Params, 0);
-            var asd2 = F.CalcVi(Params, 1);
-            var asd3 = F.CalcVi(Params, 2);
+            List<double> Params = new() { 0.1, 0.1};//истинные 0,8 0,5
+            //var asd1 = F.CalcVi(Params, 0);
+            //var asd2 = F.CalcVi(Params, 1);
+            //var asd3 = F.CalcVi(Params, 2);
             GaussNewton solver = new GaussNewton(0.1, Params, F);
-            solver.Solve(100000, 1e-10);
+            solver.Solve(100, 1e-10);
 
 
         }
@@ -1089,7 +1089,7 @@ namespace lab2
             {
                 b.Add(0);
             }
-            double penalty = F.Calc(Params);
+            double penalty = 1;
             int k = 0;
             while (penalty > eps && k < maxiter)
             {
